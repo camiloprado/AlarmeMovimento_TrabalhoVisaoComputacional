@@ -1,7 +1,11 @@
 import argparse
 import datetime as dt
+import math
+import subprocess
+import tempfile
 import threading
 import time
+import wave
 from pathlib import Path
 
 import cv2
@@ -20,6 +24,7 @@ class AlarmPlayer:
         self.pause_ms = pause_ms
         self._stop_event = threading.Event()
         self._thread = None
+        self._beep_file = self._create_beep_file()
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -34,15 +39,53 @@ class AlarmPlayer:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=0.5)
 
+    def close(self) -> None:
+        self.stop()
+        if self._beep_file:
+            try:
+                self._beep_file.unlink()
+            except FileNotFoundError:
+                pass
+
     def _play_loop(self) -> None:
         while not self._stop_event.is_set():
             if winsound is not None:
                 winsound.Beep(self.beep_hz, self.beep_ms)
+            elif self._beep_file is not None:
+                subprocess.run(
+                    ["aplay", "-q", str(self._beep_file)],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
             else:
                 print("\a", end="", flush=True)
                 time.sleep(self.beep_ms / 1000)
 
             time.sleep(self.pause_ms / 1000)
+
+    def _create_beep_file(self) -> Path | None:
+        if winsound is not None:
+            return None
+
+        sample_rate = 44100
+        duration_sec = self.beep_ms / 1000
+        total_samples = int(sample_rate * duration_sec)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+            with wave.open(temp_file, "wb") as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(sample_rate)
+
+                frames = bytearray()
+                for sample_index in range(total_samples):
+                    amplitude = 16000 * math.sin(2 * math.pi * self.beep_hz * sample_index / sample_rate)
+                    frames.extend(int(amplitude).to_bytes(2, byteorder="little", signed=True))
+
+                wav_file.writeframes(bytes(frames))
+
+        return Path(temp_file.name)
 
 
 class MotionAlarmSystem:
@@ -221,6 +264,7 @@ class MotionAlarmSystem:
 
         finally:
             self.alarm_player.stop()
+            self.alarm_player.close()
             self.capture.release()
             cv2.destroyAllWindows()
 

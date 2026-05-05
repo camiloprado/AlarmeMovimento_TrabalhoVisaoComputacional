@@ -5,7 +5,7 @@ Projeto de Visão Computacional para detectar movimento em tempo real usando té
 ## Recursos
 
 - Detecção de movimento com OpenCV (MOG2 + operações morfológicas)
-- Alarme sonoro no Windows com `winsound`
+- Alarme sonoro no Windows com `winsound` e no Linux com `aplay`/ALSA
 - Registro de evidência em imagem (`captures/`)
 - Controle em tempo real por teclado
 
@@ -13,6 +13,7 @@ Projeto de Visão Computacional para detectar movimento em tempo real usando té
 
 - Python 3.10+
 - Webcam conectada
+- No Linux, o utilitário `aplay` ajuda na reprodução do alerta sonoro
 
 Instalação de dependências:
 
